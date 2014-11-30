@@ -11,6 +11,21 @@
     </string-array>
     <string-array name="statuses">
         <item>DOWN</item>
+        <item>UP</item>
+        <item>POWERINGUP</item>
+        <item>PAUSED</item>
+        <item>MIGRATINGFROM</item>
+        <item>MIGRATINGTO</item>
         <item>UNKNOWN</item>
+        <item>NOTRESPONDING</item>
+        <item>WAITFORLAUNCH</item>
+        <item>REBOOTINPROGRESS</item>
+        <item>SAVINGSTATE</item>
+        <item>RESTORINGSTATE</item>
+        <item>SUSPENDED</item>
+        <item>IMAGEILLEGAL</item>
+        <item>IMAGELOCKED</item>
+        <item>POWERINGDOWN</item>
+        <item>PREPARINGFORHIBERNATE</item>
     </string-array>
 </resources>
