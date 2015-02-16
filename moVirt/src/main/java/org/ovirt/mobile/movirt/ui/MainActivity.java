@@ -3,10 +3,7 @@ package org.ovirt.mobile.movirt.ui;
 import android.app.Activity;
 import android.app.Dialog;
 import android.app.LoaderManager;
-import android.content.BroadcastReceiver;
-import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.Loader;
 import android.database.Cursor;
 import android.os.Bundle;
@@ -27,8 +24,6 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.fasterxml.jackson.databind.deser.std.DateDeserializers;
-
 import org.androidannotations.annotations.AfterViews;
 import org.androidannotations.annotations.App;
 import org.androidannotations.annotations.Bean;
@@ -38,9 +33,11 @@ import org.androidannotations.annotations.InstanceState;
 import org.androidannotations.annotations.ItemClick;
 import org.androidannotations.annotations.OptionsItem;
 import org.androidannotations.annotations.OptionsMenu;
+import org.androidannotations.annotations.Receiver;
 import org.androidannotations.annotations.UiThread;
 import org.androidannotations.annotations.ViewById;
 import org.androidannotations.annotations.res.StringRes;
+import org.ovirt.mobile.movirt.Broadcasts;
 import org.ovirt.mobile.movirt.MoVirtApp;
 import org.ovirt.mobile.movirt.R;
 import org.ovirt.mobile.movirt.model.Cluster;
@@ -54,8 +51,6 @@ import org.ovirt.mobile.movirt.sync.SyncAdapter;
 import org.ovirt.mobile.movirt.sync.SyncUtils;
 import org.ovirt.mobile.movirt.ui.triggers.EditTriggersActivity;
 import org.ovirt.mobile.movirt.ui.triggers.EditTriggersActivity_;
-
-import java.util.Calendar;
 
 import static org.ovirt.mobile.movirt.provider.OVirtContract.Vm.CLUSTER_ID;
 import static org.ovirt.mobile.movirt.provider.OVirtContract.Vm.NAME;
@@ -96,9 +91,6 @@ public class MainActivity extends Activity implements ClusterDrawerFragment.Clus
     @StringRes(R.string.cluster_scope)
     String CLUSTER_SCOPE;
 
-    @Bean
-    ProviderFacade provider;
-
     @InstanceState
     String selectedClusterId;
 
@@ -108,26 +100,11 @@ public class MainActivity extends Activity implements ClusterDrawerFragment.Clus
     @ViewById
     ProgressBar vmsProgress;
 
-    private final BroadcastReceiver inSyncReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            if (intent.getAction().equals(MoVirtApp.IN_SYNC)) {
-                boolean syncing = intent.getExtras().getBoolean(MoVirtApp.SYNCING);
-                syncingChanged(syncing);
-            }
-        }
-    };
+    @Bean
+    ProviderFacade provider;
 
-    private final BroadcastReceiver connectionStatusReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            switch (intent.getAction()) {
-                case MoVirtApp.CONNECTION_FAILURE:
-                    String reason = intent.getStringExtra(MoVirtApp.CONNECTION_FAILURE_REASON);
-                    Toast.makeText(MainActivity.this, R.string.disconnected + " " + reason, Toast.LENGTH_LONG).show();
-            }
-        }
-    };
+    @Bean
+    SyncUtils syncUtils;
 
     private final EndlessScrollListener endlessScrollListener = new EndlessScrollListener() {
         @Override
@@ -140,19 +117,12 @@ public class MainActivity extends Activity implements ClusterDrawerFragment.Clus
     protected void onResume() {
         super.onResume();
 
-        IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction(MoVirtApp.CONNECTION_FAILURE);
-        registerReceiver(connectionStatusReceiver, intentFilter);
-
         syncingChanged(SyncAdapter.inSync);
-        registerReceiver(inSyncReceiver, new IntentFilter(MoVirtApp.IN_SYNC));
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        unregisterReceiver(connectionStatusReceiver);
-        unregisterReceiver(inSyncReceiver);
         syncingChanged(false);
     }
 
@@ -254,7 +224,6 @@ public class MainActivity extends Activity implements ClusterDrawerFragment.Clus
         }
     }
 
-
     @Override
     public Loader<Cursor> onCreateLoader(int id, Bundle args) {
         ProviderFacade.QueryBuilder<Vm> query = provider.query(Vm.class);
@@ -309,7 +278,7 @@ public class MainActivity extends Activity implements ClusterDrawerFragment.Clus
     void refresh() {
         Log.d(TAG, "Refresh button clicked");
 
-        SyncUtils.triggerRefresh();
+        syncUtils.triggerRefresh();
     }
 
     @OptionsItem(R.id.action_settings)
@@ -362,10 +331,14 @@ public class MainActivity extends Activity implements ClusterDrawerFragment.Clus
         endlessScrollListener.resetListener();
     }
 
-
     @UiThread
-    void syncingChanged(boolean syncing) {
+    @Receiver(actions = Broadcasts.IN_SYNC, registerAt = Receiver.RegisterAt.OnResumeOnPause)
+    void syncingChanged(@Receiver.Extra(Broadcasts.Extras.SYNCING) boolean syncing) {
         vmsProgress.setVisibility(syncing ? View.VISIBLE : View.GONE);
     }
 
+    @Receiver(actions = Broadcasts.CONNECTION_FAILURE, registerAt = Receiver.RegisterAt.OnResumeOnPause)
+    void connectionFailure(@Receiver.Extra(Broadcasts.Extras.CONNECTION_FAILURE_REASON) String reason) {
+        Toast.makeText(MainActivity.this, R.string.disconnected + " " + reason, Toast.LENGTH_LONG).show();
+    }
 }
